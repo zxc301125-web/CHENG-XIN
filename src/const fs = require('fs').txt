@@ -1,0 +1,38 @@
+const fs = require('fs')
+
+const appCode = [
+  "import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'",
+  "import Properties from './pages/Properties'",
+  "import Tenants from './pages/Tenants'",
+  "import Leases from './pages/Leases'",
+  "import ClientNeeds from './pages/ClientNeeds'",
+  "",
+  "function App() {",
+  "  return (",
+  "    <BrowserRouter>",
+  "      <nav style={{padding: '16px 24px', borderBottom: '1px solid #eee', display: 'flex', gap: '24px', backgroundColor: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,0.08)'}}>",
+  "        <span style={{fontWeight: 'bold', marginRight: '16px'}}>\u{1F3E0} \u79df\u5c4b\u7ba1\u7406</span>",
+  "        <Link to='/'>\u623f\u6e90</Link>",
+  "        <Link to='/tenants'>\u79df\u7ba1</Link>",
+  "        <Link to='/leases'>\u79df\u7d04</Link>",
+  "        <Link to='/payments'>\u5ba2\u9700</Link>",
+  "        <Link to='/maintenance'>\u7dad\u4fee</Link>",
+  "      </nav>",
+  "      <div style={{padding: '24px'}}>",
+  "        <Routes>",
+  "          <Route path='/' element={<Properties />} />",
+  "          <Route path='/tenants' element={<Tenants />} />",
+  "          <Route path='/leases' element={<Leases />} />",
+  "          <Route path='/payments' element={<ClientNeeds />} />",
+  "          <Route path='/maintenance' element={<h2>\ud83d\udd27 \u7dad\u4fee\u8a18\u9304</h2>} />",
+  "        </Routes>",
+  "      </div>",
+  "    </BrowserRouter>",
+  "  )",
+  "}",
+  "",
+  "export default App"
+].join('\n')
+
+fs.writeFileSync('src/App.js', appCode, 'utf8')
+console.log('done')

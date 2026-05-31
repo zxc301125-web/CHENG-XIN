@@ -1,0 +1,1 @@
+const fs=require("fs");let c=fs.readFileSync("src/pages/Home.js","utf8");c=c.split("\u6fb3\u65b0").join("\u6f84\u65b0");fs.writeFileSync("src/pages/Home.jsx",c,"utf8");console.log("done");
