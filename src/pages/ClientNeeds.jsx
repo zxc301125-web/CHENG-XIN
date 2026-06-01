@@ -1,9 +1,11 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 
 const empty = { name: '', phone: '', move_in_date: '', residents: '', age: '', gender_relation: '', occupation: '', smoking: '否', pets: '', budget: '', area_priority: '', special_needs: '', status: '待處理' }
 
 export default function ClientNeeds() {
+  const navigate = useNavigate()
   const [list, setList] = useState([])
   const [form, setForm] = useState(empty)
   const [editId, setEditId] = useState(null)
@@ -40,6 +42,27 @@ export default function ClientNeeds() {
   function handleEdit(item) {
     setForm({ name: item.name, phone: item.phone, move_in_date: item.move_in_date||'', residents: item.residents||'', age: item.age||'', gender_relation: item.gender_relation||'', occupation: item.occupation||'', smoking: item.smoking||'否', pets: item.pets||'', budget: item.budget||'', area_priority: item.area_priority||'', special_needs: item.special_needs||'', status: item.status })
     setEditId(item.id); setShowForm(true)
+  }
+
+  // ── 轉為租客：把資料帶到 Tenants 頁面 ──
+  function handleConvertToTenant(item) {
+    if (!window.confirm(`要把「${item.name}」轉為租客嗎？\n\n會自動帶入姓名、電話與需求備註。\n轉換成功後此客需會標記為「已成交」。`)) return
+    navigate('/tenants', {
+      state: {
+        fromClientNeed: {
+          client_need_id: item.id,
+          name: item.name,
+          phone: item.phone,
+          note: [
+            item.budget && `預算 ${item.budget}`,
+            item.area_priority && `區域偏好 ${item.area_priority}`,
+            item.special_needs && `特別需求 ${item.special_needs}`,
+            item.smoking === '是' && '吸菸',
+            item.pets && `寵物 ${item.pets}`
+          ].filter(Boolean).join('；')
+        }
+      }
+    })
   }
 
   const sc = { '待處理': { bg: '#fef9c3', color: '#854d0e' }, '已配對': { bg: '#dbeafe', color: '#1e40af' }, '已成交': { bg: '#dcfce7', color: '#166534' } }
@@ -107,6 +130,12 @@ export default function ClientNeeds() {
                 {item.special_needs && <p style={{...inf, gridColumn:'1/-1'}}>需求 {item.special_needs}</p>}
               </div>
               <div style={{ display:'flex', gap:'6px', marginTop:'12px', flexWrap:'wrap' }}>
+                {/* ★ 新增「轉為租客」按鈕 ★ */}
+                {item.status !== '已成交' && (
+                  <button onClick={() => handleConvertToTenant(item)} style={{...bs('#7b1c3e'), fontSize:'12px', padding:'4px 10px'}}>
+                    → 轉為租客
+                  </button>
+                )}
                 {item.status !== '已配對' && <button onClick={() => handleStatus(item.id,'已配對')} style={{...bs('#3b82f6'), fontSize:'12px', padding:'4px 10px'}}>已配對</button>}
                 {item.status !== '已成交' && <button onClick={() => handleStatus(item.id,'已成交')} style={{...bs('#22c55e'), fontSize:'12px', padding:'4px 10px'}}>已成交</button>}
                 <button onClick={() => handleEdit(item)} style={{...bs('#f59e0b'), fontSize:'12px', padding:'4px 10px'}}>編輯</button>
@@ -126,4 +155,3 @@ const ls = { display:'block', fontSize:'13px', color:'#6b7280', marginBottom:'4p
 const inf = { margin:'2px 0', fontSize:'13px', color:'#6b7280' }
 const g2 = { display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px' }
 const bs = (bg) => ({ padding:'8px 16px', borderRadius:'8px', border:'none', background:bg, color:'#fff', cursor:'pointer', fontSize:'14px' })
-

@@ -151,7 +151,9 @@ export default function Home() {
         <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '200px', height: '200px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)' }} />
         <div style={{ position: 'absolute', bottom: '-60px', left: '-20px', width: '250px', height: '250px', borderRadius: '50%', background: 'rgba(255,255,255,0.04)' }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '8px', position: 'relative' }}>
-          <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>✨</div>
+          <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+            <img src='/logo.jpg' alt='澄新房屋' style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          </div>
           <div style={{ flex: 1 }}>
             <h1 style={{ margin: 0, color: '#fff', fontSize: '24px', fontWeight: '700', letterSpacing: '2px' }}>
               澄新房屋
