@@ -6,12 +6,11 @@ import HelpBox from '../components/HelpBox'
 export default function Leases() {
   const [leases, setLeases] = useState([])
   const [properties, setProperties] = useState([])
-  const [tenants, setTenants] = useState([])
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState({
     property_id: '',
-    tenant_id: '',
+    tenant_name: '',
     start_date: '',
     end_date: '',
     rent: '',
@@ -21,18 +20,16 @@ export default function Leases() {
   useEffect(() => { fetchAll() }, [])
 
   async function fetchAll() {
-    const [l, p, t] = await Promise.all([
+    const [l, p] = await Promise.all([
       supabase.from('leases').select('*, properties(name), tenants(name)').order('created_at', { ascending: false }),
-      supabase.from('properties').select('id, name').order('name'),
-      supabase.from('tenants').select('id, name').order('name')
+      supabase.from('properties').select('id, name').order('name')
     ])
     setLeases(l.data || [])
     setProperties(p.data || [])
-    setTenants(t.data || [])
   }
 
   function resetForm() {
-    setForm({ property_id: '', tenant_id: '', start_date: '', end_date: '', rent: '', notes: '' })
+    setForm({ property_id: '', tenant_name: '', start_date: '', end_date: '', rent: '', notes: '' })
     setEditingId(null)
     setShowForm(false)
   }
@@ -40,7 +37,7 @@ export default function Leases() {
   function handleEdit(lease) {
     setForm({
       property_id: lease.property_id || '',
-      tenant_id: lease.tenant_id || '',
+      tenant_name: lease.tenants?.name || '',
       start_date: lease.start_date || '',
       end_date: lease.end_date || '',
       rent: lease.rent || '',
@@ -50,14 +47,53 @@ export default function Leases() {
     setShowForm(true)
   }
 
+  // 取得或建立 tenant_id（依名字)
+  async function getOrCreateTenantId(rawName) {
+    const name = rawName.trim()
+    if (!name) return null
+
+    // 1. 查是否已有同名租客
+    const { data: existing } = await supabase
+      .from('tenants')
+      .select('id')
+      .eq('name', name)
+      .limit(1)
+
+    if (existing && existing.length > 0) return existing[0].id
+
+    // 2. 沒有則新增（phone 填空白，待之後到「租管」補資料）
+    const { data: newRow, error } = await supabase
+      .from('tenants')
+      .insert([{ name, phone: '' }])
+      .select('id')
+      .single()
+
+    if (error) {
+      alert('建立租客資料失敗：' + error.message)
+      return null
+    }
+    return newRow.id
+  }
+
   async function handleSubmit() {
-    if (!form.property_id || !form.tenant_id || !form.start_date || !form.end_date || !form.rent) {
+    if (!form.property_id || !form.tenant_name.trim() || !form.start_date || !form.end_date || !form.rent) {
       return alert('請填寫所有必填欄位')
     }
     if (form.end_date < form.start_date) {
       return alert('結束日不能早於開始日')
     }
-    const payload = { ...form, rent: Number(form.rent) }
+
+    const tenantId = await getOrCreateTenantId(form.tenant_name)
+    if (!tenantId) return
+
+    const payload = {
+      property_id: form.property_id,
+      tenant_id: tenantId,
+      start_date: form.start_date,
+      end_date: form.end_date,
+      rent: Number(form.rent),
+      notes: form.notes
+    }
     const { error } = editingId
       ? await supabase.from('leases').update(payload).eq('id', editingId)
       : await supabase.from('leases').insert([payload])
@@ -155,11 +191,17 @@ export default function Leases() {
             </div>
 
             <div style={{ marginBottom: '12px' }}>
-              <label style={labelStyle}>租客 *</label>
-              <select style={inputStyle} value={form.tenant_id} onChange={e => setForm({ ...form, tenant_id: e.target.value })}>
-                <option value=''>請選擇租客</option>
-                {tenants.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </select>
+              <label style={labelStyle}>租客姓名 *</label>
+              <input
+                type='text'
+                style={inputStyle}
+                placeholder='直接輸入租客姓名,如:王小明'
+                value={form.tenant_name}
+                onChange={e => setForm({ ...form, tenant_name: e.target.value })}
+              />
+              <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#a08850' }}>
+                ℹ️ 若是新租客,送出後會自動建立到「租管」,可之後再補電話等資料。
+              </p>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
