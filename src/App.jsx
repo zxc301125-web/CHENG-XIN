@@ -70,15 +70,15 @@ function App() {
   if (!session) return <Login onLogin={() => {}} />
 
   if (!profile) {
-    return <StatusScreen icon='⚠️' title='無法讀取帳號資料' message='請聯絡管理員協助處理。' email={session.user.email} onLogout={handleLogout} />
+    return <StatusScreen icon='⚠️' title='無法讀取帳號資料' message='請聯絡管理員協助處理。' onLogout={handleLogout} />
   }
 
   if (profile.status === 'pending') {
-    return <StatusScreen icon='⏳' title='帳號審核中' message='您的註冊已送出,正等待管理員審核通過。審核完成後即可登入使用。' email={profile.email} onLogout={handleLogout} />
+    return <StatusScreen icon='⏳' title='帳號審核中' message='正等待管理員審核通過' onLogout={handleLogout} />
   }
 
   if (profile.status === 'rejected') {
-    return <StatusScreen icon='🚫' title='帳號未通過審核' message='您的帳號未通過審核,如有疑問請聯絡管理員。' email={profile.email} onLogout={handleLogout} />
+    return <StatusScreen icon='🚫' title='帳號未通過審核' message='您的帳號未通過審核,如有疑問請聯絡管理員。' onLogout={handleLogout} />
   }
 
   return (
