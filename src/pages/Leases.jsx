@@ -86,6 +86,13 @@ export default function Leases() {
     const tenantId = await getOrCreateTenantId(form.tenant_name)
     if (!tenantId) return
 
+    // 編輯模式:記下原本的 property_id (避免改房源後舊房源還掛著「已租」)
+    let originalPropertyId = null
+    if (editingId) {
+      const originalLease = leases.find(l => l.id === editingId)
+      originalPropertyId = originalLease?.property_id
+    }
+
     const payload = {
       property_id: form.property_id,
       tenant_id: tenantId,
@@ -98,15 +105,46 @@ export default function Leases() {
       ? await supabase.from('leases').update(payload).eq('id', editingId)
       : await supabase.from('leases').insert([payload])
     if (error) return alert('儲存失敗：' + error.message)
+
+    // ★ 自動把選的房源標記為「已租」
+    await supabase.from('properties').update({ status: '已租' }).eq('id', form.property_id)
+
+    // ★ 編輯時改了房源,把舊房源視情況釋放
+    if (originalPropertyId && originalPropertyId !== form.property_id) {
+      await releasePropertyIfNoActiveLease(originalPropertyId)
+    }
+
     resetForm()
     fetchAll()
   }
 
   async function handleDelete(id) {
     if (!window.confirm('確定刪除此租約？相關的應收記錄也會被刪除。')) return
+    const lease = leases.find(l => l.id === id)
+
     await supabase.from('payments').delete().eq('lease_id', id)
     await supabase.from('leases').delete().eq('id', id)
+
+    // ★ 刪除後,如該房源沒其他進行中租約,把狀態改回「空房」
+    if (lease?.property_id) {
+      await releasePropertyIfNoActiveLease(lease.property_id)
+    }
+
     fetchAll()
+  }
+
+  // 若指定房源沒有任何進行中(未過期)的租約,把它狀態改回「空房」
+  async function releasePropertyIfNoActiveLease(propertyId) {
+    const today = new Date().toISOString().slice(0, 10)
+    const { data: activeLeases } = await supabase
+      .from('leases')
+      .select('id')
+      .eq('property_id', propertyId)
+      .gte('end_date', today)
+
+    if (!activeLeases || activeLeases.length === 0) {
+      await supabase.from('properties').update({ status: '空房' }).eq('id', propertyId)
+    }
   }
 
   // 計算剩餘天數
