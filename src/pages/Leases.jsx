@@ -5,11 +5,10 @@ import HelpBox from '../components/HelpBox'
 
 export default function Leases() {
   const [leases, setLeases] = useState([])
-  const [properties, setProperties] = useState([])
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState({
-    property_id: '',
+    property_name: '',
     tenant_name: '',
     start_date: '',
     end_date: '',
@@ -20,23 +19,24 @@ export default function Leases() {
   useEffect(() => { fetchAll() }, [])
 
   async function fetchAll() {
-    const [l, p] = await Promise.all([
-      supabase.from('leases').select('*, properties(name), tenants(name)').order('created_at', { ascending: false }),
-      supabase.from('properties').select('id, name').order('name')
-    ])
-    setLeases(l.data || [])
-    setProperties(p.data || [])
+    // 仍 join properties(name) 以便顯示舊資料(property_id 還在的租約)
+    const { data } = await supabase
+      .from('leases')
+      .select('*, properties(name), tenants(name)')
+      .order('created_at', { ascending: false })
+    setLeases(data || [])
   }
 
   function resetForm() {
-    setForm({ property_id: '', tenant_name: '', start_date: '', end_date: '', rent: '', notes: '' })
+    setForm({ property_name: '', tenant_name: '', start_date: '', end_date: '', rent: '', notes: '' })
     setEditingId(null)
     setShowForm(false)
   }
 
   function handleEdit(lease) {
     setForm({
-      property_id: lease.property_id || '',
+      // 優先用新的 property_name,沒值再退回舊關聯
+      property_name: lease.property_name || lease.properties?.name || '',
       tenant_name: lease.tenants?.name || '',
       start_date: lease.start_date || '',
       end_date: lease.end_date || '',
@@ -47,12 +47,11 @@ export default function Leases() {
     setShowForm(true)
   }
 
-  // 取得或建立 tenant_id（依名字)
+  // 取得或建立 tenant_id(依名字)
   async function getOrCreateTenantId(rawName) {
     const name = rawName.trim()
     if (!name) return null
 
-    // 1. 查是否已有同名租客
     const { data: existing } = await supabase
       .from('tenants')
       .select('id')
@@ -61,7 +60,6 @@ export default function Leases() {
 
     if (existing && existing.length > 0) return existing[0].id
 
-    // 2. 沒有則新增（phone 填空白，待之後到「租管」補資料）
     const { data: newRow, error } = await supabase
       .from('tenants')
       .insert([{ name, phone: '' }])
@@ -69,14 +67,14 @@ export default function Leases() {
       .single()
 
     if (error) {
-      alert('建立租客資料失敗：' + error.message)
+      alert('建立租客資料失敗:' + error.message)
       return null
     }
     return newRow.id
   }
 
   async function handleSubmit() {
-    if (!form.property_id || !form.tenant_name.trim() || !form.start_date || !form.end_date || !form.rent) {
+    if (!form.property_name.trim() || !form.tenant_name.trim() || !form.start_date || !form.end_date || !form.rent) {
       return alert('請填寫所有必填欄位')
     }
     if (form.end_date < form.start_date) {
@@ -86,15 +84,9 @@ export default function Leases() {
     const tenantId = await getOrCreateTenantId(form.tenant_name)
     if (!tenantId) return
 
-    // 編輯模式:記下原本的 property_id (避免改房源後舊房源還掛著「已租」)
-    let originalPropertyId = null
-    if (editingId) {
-      const originalLease = leases.find(l => l.id === editingId)
-      originalPropertyId = originalLease?.property_id
-    }
-
     const payload = {
-      property_id: form.property_id,
+      property_id: null,                          // 不再與 properties 表連動
+      property_name: form.property_name.trim(),   // 直接存文字
       tenant_id: tenantId,
       start_date: form.start_date,
       end_date: form.end_date,
@@ -104,47 +96,19 @@ export default function Leases() {
     const { error } = editingId
       ? await supabase.from('leases').update(payload).eq('id', editingId)
       : await supabase.from('leases').insert([payload])
-    if (error) return alert('儲存失敗：' + error.message)
-
-    // ★ 自動把選的房源標記為「已租」
-    await supabase.from('properties').update({ status: '已租' }).eq('id', form.property_id)
-
-    // ★ 編輯時改了房源,把舊房源視情況釋放
-    if (originalPropertyId && originalPropertyId !== form.property_id) {
-      await releasePropertyIfNoActiveLease(originalPropertyId)
-    }
+    if (error) return alert('儲存失敗:' + error.message)
 
     resetForm()
     fetchAll()
   }
 
   async function handleDelete(id) {
-    if (!window.confirm('確定刪除此租約？相關的應收記錄也會被刪除。')) return
-    const lease = leases.find(l => l.id === id)
+    if (!window.confirm('確定刪除此租約?')) return
 
+    // 同時清掉相關 payments,避免孤兒記錄(實收/應收功能雖隱藏,資料表仍存在)
     await supabase.from('payments').delete().eq('lease_id', id)
     await supabase.from('leases').delete().eq('id', id)
-
-    // ★ 刪除後,如該房源沒其他進行中租約,把狀態改回「空房」
-    if (lease?.property_id) {
-      await releasePropertyIfNoActiveLease(lease.property_id)
-    }
-
     fetchAll()
-  }
-
-  // 若指定房源沒有任何進行中(未過期)的租約,把它狀態改回「空房」
-  async function releasePropertyIfNoActiveLease(propertyId) {
-    const today = new Date().toISOString().slice(0, 10)
-    const { data: activeLeases } = await supabase
-      .from('leases')
-      .select('id')
-      .eq('property_id', propertyId)
-      .gte('end_date', today)
-
-    if (!activeLeases || activeLeases.length === 0) {
-      await supabase.from('properties').update({ status: '空房' }).eq('id', propertyId)
-    }
   }
 
   // 計算剩餘天數
@@ -154,7 +118,7 @@ export default function Leases() {
     return Math.round((end - today) / 86400000)
   }
 
-  // 判斷租約狀態（依剩餘天數自動分類）
+  // 判斷租約狀態(依剩餘天數自動分類)
   function leaseStatus(lease) {
     const left = daysUntil(lease.end_date)
     if (left < 0) return { label: `已過期 ${Math.abs(left)} 天`, color: '#999', bg: '#f0f0f0' }
@@ -191,19 +155,19 @@ export default function Leases() {
               <HelpBox title="租約管理使用說明">
                 <p style={{ margin: '0 0 6px' }}>建立並追蹤所有合約,系統自動依結束日提醒。</p>
                 <ol style={{ margin: '4px 0 0', paddingLeft: '18px' }}>
-                  <li>點「+ 新增租約」,選房源與租客。</li>
+                  <li>點「+ 新增租約」。</li>
+                  <li>直接輸入房源名稱與租客姓名。</li>
                   <li>填入起迄日與月租金。</li>
                   <li>列表自動顯示剩餘天數,30 天內以橘色提示。</li>
-                  <li>建立後到「應收記錄」一鍵產生每月應收。</li>
                 </ol>
                 <p style={{ margin: '6px 0 0', fontSize: '11px', color: '#a08850' }}>
-                  ※ 刪除合約會同時清掉相關應收記錄。
+                  ※ 房源為自由輸入,不會與「房源管理」資料表自動連動。
                 </p>
               </HelpBox>
             </h1>
             <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>共 {leases.length} 筆租約</p>
           </div>
-          <Link to='/payments' style={{ padding: '8px 14px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.4)', background: 'transparent', color: '#fff', fontSize: '12px', textDecoration: 'none' }}>應收記錄 →</Link>
+          {/* 「應收記錄 →」按鈕已隱藏 */}
         </div>
       </div>
 
@@ -222,10 +186,13 @@ export default function Leases() {
 
             <div style={{ marginBottom: '12px' }}>
               <label style={labelStyle}>房源 *</label>
-              <select style={inputStyle} value={form.property_id} onChange={e => setForm({ ...form, property_id: e.target.value })}>
-                <option value=''>請選擇房源</option>
-                {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+              <input
+                type='text'
+                style={inputStyle}
+                placeholder='直接輸入房源,例:大安路 2 樓 A 房'
+                value={form.property_name}
+                onChange={e => setForm({ ...form, property_name: e.target.value })}
+              />
             </div>
 
             <div style={{ marginBottom: '12px' }}>
@@ -255,7 +222,7 @@ export default function Leases() {
 
             <div style={{ marginBottom: '12px' }}>
               <label style={labelStyle}>月租金 (NT$) *</label>
-              <input type='number' style={inputStyle} placeholder='例：15000' value={form.rent} onChange={e => setForm({ ...form, rent: e.target.value })} />
+              <input type='number' style={inputStyle} placeholder='例:15000' value={form.rent} onChange={e => setForm({ ...form, rent: e.target.value })} />
             </div>
 
             <div style={{ marginBottom: '16px' }}>
@@ -276,26 +243,28 @@ export default function Leases() {
 
         {leases.length === 0 ? (
           <div style={{ background: '#fff', borderRadius: '14px', padding: '40px 20px', textAlign: 'center', color: '#bbb', fontSize: '13px' }}>
-            目前沒有租約，點擊上方「新增租約」開始
+            目前沒有租約,點擊上方「新增租約」開始
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {leases.map(lease => {
               const status = leaseStatus(lease)
+              // 優先顯示新欄位,沒有再退回舊關聯
+              const displayProperty = lease.property_name || lease.properties?.name || '未指定房源'
               return (
                 <div key={lease.id} style={{ background: '#fff', borderRadius: '12px', padding: '16px', boxShadow: '0 2px 8px rgba(123,28,62,0.06)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                         <p style={{ margin: 0, fontSize: '15px', fontWeight: '600', color: '#3d1020' }}>
-                          {lease.properties?.name || '未指定房源'}
+                          {displayProperty}
                         </p>
                         <span style={{ fontSize: '10px', fontWeight: '600', padding: '2px 8px', borderRadius: '10px', background: status.bg, color: status.color }}>
                           {status.label}
                         </span>
                       </div>
                       <p style={{ margin: '0 0 4px', fontSize: '13px', color: '#666' }}>
-                        租客：{lease.tenants?.name || '未指定'}
+                        租客:{lease.tenants?.name || '未指定'}
                       </p>
                       <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>
                         {lease.start_date} ~ {lease.end_date}

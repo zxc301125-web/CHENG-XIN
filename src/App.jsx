@@ -8,7 +8,6 @@ import Tenants from './pages/Tenants'
 import Leases from './pages/Leases'
 import ClientNeeds from './pages/ClientNeeds'
 import Maintenance from './pages/Maintenance'
-import Payments from './pages/Payments'
 import Admin from './pages/Admin'
 
 function App() {
@@ -89,7 +88,6 @@ function App() {
           <Route path='/properties' element={<Properties />} />
           <Route path='/tenants' element={<Tenants />} />
           <Route path='/leases' element={<Leases />} />
-          <Route path='/payments' element={<Payments />} />
           <Route path='/client-needs' element={<ClientNeeds />} />
           <Route path='/maintenance' element={<Maintenance />} />
           <Route path='/admin' element={profile.role === 'admin' ? <Admin /> : <Navigate to='/' replace />} />

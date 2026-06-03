@@ -9,9 +9,6 @@ export default function Home() {
     monthlyIncome: 0,
     prevIncome: 0,
     repairCost: 0,
-    totalCollected: 0,
-    totalDue: 0,
-    unpaidCount: 0,
     expiringCount: 0,
     nextExpiryDate: null,
     nextExpiryDays: null,
@@ -35,7 +32,7 @@ export default function Home() {
   }
 
   async function fetchAll() {
-    // 計算本月與上月字串（payments.month 假設格式 YYYY-MM）
+    // 計算本月與上月字串(payments.month 假設格式 YYYY-MM)
     const today = new Date()
     const yyyy = today.getFullYear()
     const mm = String(today.getMonth() + 1).padStart(2, '0')
@@ -52,9 +49,10 @@ export default function Home() {
       supabase.from('maintenance').select('id'),
       supabase.from('client_needs').select('id'),
       supabase.from('announcements').select('*').order('created_at', { ascending: false }),
+      // payments 資料保留,只在 UI 上隱藏「實收/應收」指標卡
       supabase.from('payments').select('amount, paid').eq('month', thisMonth),
       supabase.from('payments').select('amount, paid').eq('month', prevMonth),
-      // 抓所有未到期的合約，依到期日由近到遠排序
+      // 抓所有未到期的合約,依到期日由近到遠排序
       supabase.from('leases').select('id, end_date').gte('end_date', todayStr).order('end_date', { ascending: true }),
       supabase.from('maintenance').select('cost, created_at').gte('created_at', thisMonthStart),
     ])
@@ -66,19 +64,16 @@ export default function Home() {
     const vacant = rooms.filter(r => r.status === 'vacant').length
     const repair = rooms.filter(r => r.status === 'repair').length
 
-    // ── 收支計算 ──
+    // ── 收支計算(仍計算本月/上月收入以維持租金大卡)──
     const thisList = paysThis.data || []
     const prevList = paysPrev.data || []
     const monthlyIncome = thisList.filter(x => x.paid).reduce((s, x) => s + (Number(x.amount) || 0), 0)
     const prevIncome    = prevList.filter(x => x.paid).reduce((s, x) => s + (Number(x.amount) || 0), 0)
-    const totalDue       = thisList.reduce((s, x) => s + (Number(x.amount) || 0), 0)
-    const totalCollected = monthlyIncome
-    const unpaidCount    = thisList.filter(x => !x.paid).length
 
-    // ── 維修支出（若無 cost 欄位則為 0，不會 crash） ──
+    // ── 維修支出 ──
     const repairCost = (maint.data || []).reduce((s, x) => s + (Number(x.cost) || 0), 0)
 
-    // ── 抓最近一筆到期合約（futureLeases 已按 end_date 排序，首筆即為最近）──
+    // ── 抓最近一筆到期合約 ──
     const futureList = futureLeases.data || []
     const nextLease = futureList[0]
     const nextExpiryDate = nextLease ? nextLease.end_date : null
@@ -96,7 +91,6 @@ export default function Home() {
     })
     setFinance({
       monthlyIncome, prevIncome, repairCost,
-      totalCollected, totalDue, unpaidCount,
       expiringCount: futureList.length,
       nextExpiryDate, nextExpiryDays,
       rooms, rented, vacant, repair,
@@ -113,7 +107,7 @@ export default function Home() {
   }
 
   async function handleDeleteAnn(id) {
-    if (!window.confirm('確定刪除此公告？')) return
+    if (!window.confirm('確定刪除此公告?')) return
     await supabase.from('announcements').delete().eq('id', id)
     fetchAll()
   }
@@ -130,11 +124,9 @@ export default function Home() {
     { label: '維修記錄', value: stats.maintenance, sub: '維修筆數', to: '/maintenance', color: '#9d2449', icon: '🔧' },
   ]
 
-  // ── 收益概覽用的格式化函式 ──
   const fmt = n => 'NT$' + Math.round(n || 0).toLocaleString()
   const pct = (a, b) => b > 0 ? Math.round(a / b * 100) : 0
   const occPct = pct(finance.rented, stats.properties)
-  const collectPct = pct(finance.totalCollected, finance.totalDue)
   const momChg = finance.prevIncome > 0
     ? +((finance.monthlyIncome - finance.prevIncome) / finance.prevIncome * 100).toFixed(1)
     : null
@@ -162,11 +154,11 @@ export default function Home() {
                 <ul style={{ margin: '4px 0 0', paddingLeft: '16px' }}>
                   <li><b>本月租金收入</b>:已收到的租金總和。</li>
                   <li><b>出租率</b>:已出租 / 總間數。</li>
-                  <li><b>實收 / 應收</b>:本月繳費比例。</li>
+                  <li><b>維修支出</b>:本月維修累計成本。</li>
                   <li><b>下一個合約到期</b>:最早到期的日期與剩餘天數。</li>
                 </ul>
                 <p style={{ margin: '6px 0 0', fontSize: '11px', color: '#a08850' }}>
-                  ※ 記得先在「房源」「租約」「應收」建立資料。
+                  ※ 記得先在「房源」「租約」建立資料。
                 </p>
               </HelpBox>
             </h1>
@@ -179,7 +171,7 @@ export default function Home() {
 
       <div style={{ padding: '24px', marginTop: '-20px' }}>
 
-        {/* ★ 收益概覽（取代「今日概況」）★ */}
+        {/* ★ 本月租金收入(保留)★ */}
         <div style={{ background: 'linear-gradient(135deg, #7b1c3e 0%, #9d2449 60%, #b52d56 100%)', borderRadius: '18px', padding: '22px 22px 18px', color: '#fff', position: 'relative', overflow: 'hidden', marginBottom: '12px', boxShadow: '0 6px 20px rgba(123,28,62,0.25)' }}>
           <div style={{ position: 'absolute', top: '-30px', right: '-30px', width: '140px', height: '140px', borderRadius: '50%', background: 'rgba(255,255,255,0.08)' }} />
           <div style={{ position: 'absolute', bottom: '-35px', right: '50px', width: '90px', height: '90px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)' }} />
@@ -202,43 +194,8 @@ export default function Home() {
           </div>
         </div>
 
-        {/* 四格指標 */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
-          <div style={{ background: '#fff', borderRadius: '14px', padding: '14px', boxShadow: '0 2px 8px rgba(123,28,62,0.06)' }}>
-            <p style={{ margin: '0 0 6px', fontSize: '11px', fontWeight: '600', color: '#aaa', letterSpacing: '0.05em' }}>🏠 出租率</p>
-            <p style={{ margin: 0, fontSize: '22px', fontWeight: '700', color: '#7b1c3e' }}>{occPct}%</p>
-            <p style={{ margin: '3px 0 0', fontSize: '11px', color: '#bbb' }}>{finance.rented} 間出租 / 共 {stats.properties} 間</p>
-          </div>
-          <div style={{ background: '#fff', borderRadius: '14px', padding: '14px', boxShadow: '0 2px 8px rgba(123,28,62,0.06)' }}>
-            <p style={{ margin: '0 0 6px', fontSize: '11px', fontWeight: '600', color: '#aaa', letterSpacing: '0.05em' }}>💰 實收 / 應收</p>
-            <p style={{ margin: 0, fontSize: '22px', fontWeight: '700', color: '#2eaa5c' }}>{collectPct}%</p>
-            <p style={{ margin: '3px 0 0', fontSize: '11px', color: '#bbb' }}>{finance.unpaidCount === 0 ? '本月無逾期' : finance.unpaidCount + ' 筆未繳'}</p>
-          </div>
-          <div style={{ background: '#fff', borderRadius: '14px', padding: '14px', boxShadow: '0 2px 8px rgba(123,28,62,0.06)' }}>
-            <p style={{ margin: '0 0 6px', fontSize: '11px', fontWeight: '600', color: '#aaa', letterSpacing: '0.05em' }}>🔧 維修支出</p>
-            <p style={{ margin: 0, fontSize: '22px', fontWeight: '700', color: '#d48b00' }}>{fmt(finance.repairCost)}</p>
-            <p style={{ margin: '3px 0 0', fontSize: '11px', color: '#bbb' }}>淨收 {fmt(finance.monthlyIncome - finance.repairCost)}</p>
-          </div>
-          <div style={{ background: '#fff', borderRadius: '14px', padding: '14px', boxShadow: '0 2px 8px rgba(123,28,62,0.06)' }}>
-            <p style={{ margin: '0 0 6px', fontSize: '11px', fontWeight: '600', color: '#aaa', letterSpacing: '0.05em' }}>📋 下一個合約到期</p>
-            {finance.nextExpiryDate ? (
-              <>
-                <p style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: '#e24b4a' }}>{finance.nextExpiryDate}</p>
-                <p style={{ margin: '3px 0 0', fontSize: '11px', color: '#bbb' }}>
-                  {finance.nextExpiryDays === 0 ? '今天到期' : finance.nextExpiryDays > 0 ? `還剩 ${finance.nextExpiryDays} 天` : '已過期'}
-                </p>
-              </>
-            ) : (
-              <>
-                <p style={{ margin: 0, fontSize: '22px', fontWeight: '700', color: '#bbb' }}>—</p>
-                <p style={{ margin: '3px 0 0', fontSize: '11px', color: '#bbb' }}>無進行中合約</p>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* 出租狀況 */}
-        <div style={{ background: '#fff', borderRadius: '14px', padding: '18px', boxShadow: '0 2px 12px rgba(123,28,62,0.08)', marginBottom: '20px' }}>
+        {/* ★ 出租狀況(已移到本月租金收入下方)★ */}
+        <div style={{ background: '#fff', borderRadius: '14px', padding: '18px', boxShadow: '0 2px 12px rgba(123,28,62,0.08)', marginBottom: '12px' }}>
           <p style={{ margin: '0 0 14px', fontSize: '15px', fontWeight: '700', color: '#7b1c3e', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span>🏘️</span>出租狀況
           </p>
@@ -273,7 +230,36 @@ export default function Home() {
             </div>
           )}
         </div>
-        {/* ★ 收益概覽結束 ★ */}
+
+        {/* 指標(已移除「實收/應收」卡)*/}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>
+          <div style={{ background: '#fff', borderRadius: '14px', padding: '14px', boxShadow: '0 2px 8px rgba(123,28,62,0.06)' }}>
+            <p style={{ margin: '0 0 6px', fontSize: '11px', fontWeight: '600', color: '#aaa', letterSpacing: '0.05em' }}>🏠 出租率</p>
+            <p style={{ margin: 0, fontSize: '22px', fontWeight: '700', color: '#7b1c3e' }}>{occPct}%</p>
+            <p style={{ margin: '3px 0 0', fontSize: '11px', color: '#bbb' }}>{finance.rented} 間出租 / 共 {stats.properties} 間</p>
+          </div>
+          <div style={{ background: '#fff', borderRadius: '14px', padding: '14px', boxShadow: '0 2px 8px rgba(123,28,62,0.06)' }}>
+            <p style={{ margin: '0 0 6px', fontSize: '11px', fontWeight: '600', color: '#aaa', letterSpacing: '0.05em' }}>🔧 維修支出</p>
+            <p style={{ margin: 0, fontSize: '22px', fontWeight: '700', color: '#d48b00' }}>{fmt(finance.repairCost)}</p>
+            <p style={{ margin: '3px 0 0', fontSize: '11px', color: '#bbb' }}>淨收 {fmt(finance.monthlyIncome - finance.repairCost)}</p>
+          </div>
+          <div style={{ gridColumn: 'span 2', background: '#fff', borderRadius: '14px', padding: '14px', boxShadow: '0 2px 8px rgba(123,28,62,0.06)' }}>
+            <p style={{ margin: '0 0 6px', fontSize: '11px', fontWeight: '600', color: '#aaa', letterSpacing: '0.05em' }}>📋 下一個合約到期</p>
+            {finance.nextExpiryDate ? (
+              <>
+                <p style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: '#e24b4a' }}>{finance.nextExpiryDate}</p>
+                <p style={{ margin: '3px 0 0', fontSize: '11px', color: '#bbb' }}>
+                  {finance.nextExpiryDays === 0 ? '今天到期' : finance.nextExpiryDays > 0 ? `還剩 ${finance.nextExpiryDays} 天` : '已過期'}
+                </p>
+              </>
+            ) : (
+              <>
+                <p style={{ margin: 0, fontSize: '22px', fontWeight: '700', color: '#bbb' }}>—</p>
+                <p style={{ margin: '3px 0 0', fontSize: '11px', color: '#bbb' }}>無進行中合約</p>
+              </>
+            )}
+          </div>
+        </div>
 
         <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', marginBottom: '20px', boxShadow: '0 2px 12px rgba(123,28,62,0.08)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
