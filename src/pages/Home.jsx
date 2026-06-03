@@ -171,6 +171,62 @@ export default function Home() {
 
       <div style={{ padding: '24px', marginTop: '-20px' }}>
 
+        {/* ★ 重大公告(有公告或新增中才顯示)★ */}
+        {(announcements.length > 0 || showAnnForm) ? (
+        <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', marginBottom: '12px', boxShadow: '0 2px 12px rgba(123,28,62,0.08)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '18px' }}>📣</span>
+              <p style={{ margin: 0, fontSize: '15px', fontWeight: '600', color: '#7b1c3e' }}>重大公告</p>
+            </div>
+            <button onClick={() => setShowAnnForm(!showAnnForm)} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', background: '#7b1c3e', color: '#fff', fontSize: '12px', cursor: 'pointer' }}>+ 新增公告</button>
+          </div>
+          {showAnnForm && (
+            <div style={{ background: '#fdf8f9', border: '1px solid #f0d8df', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+              <div style={{ marginBottom: '10px' }}>
+                <label style={{ display: 'block', fontSize: '13px', color: '#7b1c3e', marginBottom: '4px', fontWeight: '500' }}>公告標題 *</label>
+                <input style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e8c8d0', fontSize: '14px', boxSizing: 'border-box' }} placeholder="請輸入公告標題" value={annForm.title} onChange={e => setAnnForm({...annForm, title: e.target.value})} />
+              </div>
+              <div style={{ marginBottom: '10px' }}>
+                <label style={{ display: 'block', fontSize: '13px', color: '#7b1c3e', marginBottom: '4px', fontWeight: '500' }}>公告內容 *</label>
+                <textarea style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e8c8d0', fontSize: '14px', boxSizing: 'border-box', height: '80px', resize: 'vertical' }} placeholder="請輸入公告內容" value={annForm.content} onChange={e => setAnnForm({...annForm, content: e.target.value})} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                <input type="checkbox" id="important" checked={annForm.important} onChange={e => setAnnForm({...annForm, important: e.target.checked})} />
+                <label htmlFor="important" style={{ fontSize: '13px', color: '#7b1c3e', cursor: 'pointer' }}>標記為重要公告</label>
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={handleAddAnn} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: '#7b1c3e', color: '#fff', fontSize: '13px', cursor: 'pointer' }}>發布公告</button>
+                <button onClick={() => setShowAnnForm(false)} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #e8c8d0', background: '#fff', color: '#7b1c3e', fontSize: '13px', cursor: 'pointer' }}>取消</button>
+              </div>
+            </div>
+          )}
+          {announcements.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {announcements.map(ann => (
+                <div key={ann.id} style={{ border: ann.important ? '1px solid #e8a0b0' : '1px solid #f0e8ec', borderRadius: '10px', padding: '14px 16px', background: ann.important ? '#fdf0f3' : '#fdfafb' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                        {ann.important && <span style={{ background: '#7b1c3e', color: '#fff', fontSize: '10px', padding: '2px 8px', borderRadius: '10px', fontWeight: '500' }}>重要</span>}
+                        <p style={{ margin: 0, fontWeight: '600', fontSize: '14px', color: '#3d1020' }}>{ann.title}</p>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '13px', color: '#666', lineHeight: '1.6' }}>{ann.content}</p>
+                      <p style={{ margin: '8px 0 0', fontSize: '11px', color: '#bbb' }}>{new Date(ann.created_at).toLocaleDateString('zh-TW')}</p>
+                    </div>
+                    <button onClick={() => handleDeleteAnn(ann.id)} style={{ background: 'none', border: 'none', color: '#ccc', cursor: 'pointer', fontSize: '16px', padding: '0 0 0 8px' }}>×</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        ) : (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
+            <button onClick={() => setShowAnnForm(true)} style={{ background: 'transparent', border: '1px dashed #e8c8d0', color: '#9d2449', padding: '6px 14px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer' }}>+ 新增公告</button>
+          </div>
+        )}
+
         {/* ★ 本月租金收入(保留)★ */}
         <div style={{ background: 'linear-gradient(135deg, #7b1c3e 0%, #9d2449 60%, #b52d56 100%)', borderRadius: '18px', padding: '22px 22px 18px', color: '#fff', position: 'relative', overflow: 'hidden', marginBottom: '12px', boxShadow: '0 6px 20px rgba(123,28,62,0.25)' }}>
           <div style={{ position: 'absolute', top: '-30px', right: '-30px', width: '140px', height: '140px', borderRadius: '50%', background: 'rgba(255,255,255,0.08)' }} />
@@ -259,57 +315,6 @@ export default function Home() {
               </>
             )}
           </div>
-        </div>
-
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', marginBottom: '20px', boxShadow: '0 2px 12px rgba(123,28,62,0.08)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '18px' }}>📣</span>
-              <p style={{ margin: 0, fontSize: '15px', fontWeight: '600', color: '#7b1c3e' }}>重大公告</p>
-            </div>
-            <button onClick={() => setShowAnnForm(!showAnnForm)} style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', background: '#7b1c3e', color: '#fff', fontSize: '12px', cursor: 'pointer' }}>+ 新增公告</button>
-          </div>
-          {showAnnForm && (
-            <div style={{ background: '#fdf8f9', border: '1px solid #f0d8df', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
-              <div style={{ marginBottom: '10px' }}>
-                <label style={{ display: 'block', fontSize: '13px', color: '#7b1c3e', marginBottom: '4px', fontWeight: '500' }}>公告標題 *</label>
-                <input style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e8c8d0', fontSize: '14px', boxSizing: 'border-box' }} placeholder="請輸入公告標題" value={annForm.title} onChange={e => setAnnForm({...annForm, title: e.target.value})} />
-              </div>
-              <div style={{ marginBottom: '10px' }}>
-                <label style={{ display: 'block', fontSize: '13px', color: '#7b1c3e', marginBottom: '4px', fontWeight: '500' }}>公告內容 *</label>
-                <textarea style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e8c8d0', fontSize: '14px', boxSizing: 'border-box', height: '80px', resize: 'vertical' }} placeholder="請輸入公告內容" value={annForm.content} onChange={e => setAnnForm({...annForm, content: e.target.value})} />
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                <input type="checkbox" id="important" checked={annForm.important} onChange={e => setAnnForm({...annForm, important: e.target.checked})} />
-                <label htmlFor="important" style={{ fontSize: '13px', color: '#7b1c3e', cursor: 'pointer' }}>標記為重要公告</label>
-              </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button onClick={handleAddAnn} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: '#7b1c3e', color: '#fff', fontSize: '13px', cursor: 'pointer' }}>發布公告</button>
-                <button onClick={() => setShowAnnForm(false)} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #e8c8d0', background: '#fff', color: '#7b1c3e', fontSize: '13px', cursor: 'pointer' }}>取消</button>
-              </div>
-            </div>
-          )}
-          {announcements.length === 0 ? (
-            <p style={{ color: '#bbb', fontSize: '13px', textAlign: 'center', padding: '20px 0' }}>目前沒有公告</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {announcements.map(ann => (
-                <div key={ann.id} style={{ border: ann.important ? '1px solid #e8a0b0' : '1px solid #f0e8ec', borderRadius: '10px', padding: '14px 16px', background: ann.important ? '#fdf0f3' : '#fdfafb' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                        {ann.important && <span style={{ background: '#7b1c3e', color: '#fff', fontSize: '10px', padding: '2px 8px', borderRadius: '10px', fontWeight: '500' }}>重要</span>}
-                        <p style={{ margin: 0, fontWeight: '600', fontSize: '14px', color: '#3d1020' }}>{ann.title}</p>
-                      </div>
-                      <p style={{ margin: 0, fontSize: '13px', color: '#666', lineHeight: '1.6' }}>{ann.content}</p>
-                      <p style={{ margin: '8px 0 0', fontSize: '11px', color: '#bbb' }}>{new Date(ann.created_at).toLocaleDateString('zh-TW')}</p>
-                    </div>
-                    <button onClick={() => handleDeleteAnn(ann.id)} style={{ background: 'none', border: 'none', color: '#ccc', cursor: 'pointer', fontSize: '16px', padding: '0 0 0 8px' }}>×</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
 
         <p style={{ margin: '0 0 12px', fontSize: '13px', color: '#9d2449', fontWeight: '500' }}>功能選單</p>
